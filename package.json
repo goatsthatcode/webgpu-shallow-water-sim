@@ -1,0 +1,11 @@
+{
+  "name": "webgpu-shallow-water",
+  "private": true,
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build"
+  },
+  "devDependencies": {
+    "vite": "^5.4.0"
+  }
+}

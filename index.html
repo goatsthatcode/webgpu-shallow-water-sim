@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>WebGPU Shallow Water</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: #0a0a12; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; font-family: monospace; color: #aaa; }
+    canvas { display: block; border: 1px solid #222; }
+    #status { margin-top: 12px; font-size: 13px; }
+  </style>
+</head>
+<body>
+  <canvas id="canvas" width="700" height="700"></canvas>
+  <div id="status">initializing...</div>
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>
