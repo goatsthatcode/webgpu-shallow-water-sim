@@ -5,14 +5,127 @@
   <title>WebGPU Shallow Water</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { background: #0a0a12; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; font-family: monospace; color: #aaa; }
+    body {
+      background: #0a0a12;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      min-height: 100vh; font-family: monospace; color: #aaa; gap: 8px; padding: 16px 0;
+    }
     canvas { display: block; border: 1px solid #222; }
-    #status { margin-top: 12px; font-size: 13px; }
+    #status { font-size: 12px; color: #555; }
+
+    .controls-row {
+      display: flex; align-items: center; gap: 14px; font-size: 13px; flex-wrap: wrap; justify-content: center;
+    }
+    .dim  { color: #444; }
+    .val  { color: #ddd; min-width: 3.8ch; display: inline-block; }
+    .hint { color: #555; font-size: 11px; }
+
+    label { display: flex; align-items: center; gap: 6px; }
+    input[type=range] { accent-color: #3af; cursor: pointer; }
+
+    button {
+      background: none; border: 1px solid #444; color: #aaa;
+      font-family: monospace; font-size: 13px;
+      padding: 3px 10px; cursor: pointer; border-radius: 3px;
+    }
+    button:hover { border-color: #3af; color: #3af; }
+    select { background: #111; border: 1px solid #444; color: #aaa; font-family: monospace; font-size: 13px; padding: 3px 6px; border-radius: 3px; cursor: pointer; }
+    select:hover { border-color: #3af; }
   </style>
 </head>
 <body>
   <canvas id="canvas" width="700" height="700"></canvas>
   <div id="status">initializing...</div>
+
+  <!-- Row 1: playback -->
+  <div class="controls-row">
+    <button id="pause-btn">pause</button>
+    <span class="dim">|</span>
+    <label>
+      speed
+      <input type="range" id="speed-slider" min="1" max="30" step="1" value="2" style="width:110px">
+      <span class="val" id="speed-val">2</span><span class="dim">steps/frame</span>
+    </label>
+    <span class="dim">|</span>
+    <button id="reset-btn">reset</button>
+    <span class="dim">|</span>
+    <label>
+      scheme
+      <select id="scheme-select">
+        <option value="lax-friedrichs">Lax-Friedrichs (1st order)</option>
+        <option value="rk4">RK4 (4th order)</option>
+      </select>
+    </label>
+  </div>
+
+  <!-- Row 2: physics -->
+  <div class="controls-row">
+    <label title="IC Gaussian half-width. Change takes effect on reset.">
+      σ <span class="hint">(IC width)</span>
+      <input type="range" id="sigma-slider" min="0.03" max="0.20" step="0.01" value="0.10" style="width:110px">
+      <span class="val" id="sigma-val">0.10</span>
+    </label>
+    <span class="dim">|</span>
+    <label title="Mean fluid depth. Controls gravity wave speed c=√(g·H).">
+      H <span class="hint">(depth)</span>
+      <input type="range" id="H-slider" min="0.02" max="1.0" step="0.02" value="0.25" style="width:110px">
+      <span class="val" id="H-val">0.25</span>
+      <span class="dim">c=<span id="c-val">0.50</span></span>
+    </label>
+    <span class="dim">|</span>
+    <label title="Coriolis parameter f. L_R = c/f is the Rossby deformation radius.">
+      f <span class="hint">(Coriolis)</span>
+      <input type="range" id="f-slider" min="0" max="0.2" step="0.005" value="0" style="width:110px">
+      <span class="val" id="f-val">0.000</span>
+      <span class="dim">L<sub>R</sub>=<span id="lr-val">∞</span></span>
+    </label>
+  </div>
+
+  <!-- Row 3: display -->
+  <div class="controls-row">
+    <label>
+      display
+      <select id="display-select">
+        <option value="0">h anomaly (h − h_eq)</option>
+        <option value="1">vorticity (∂v/∂x − ∂u/∂y)</option>
+        <option value="2">raw h</option>
+      </select>
+    </label>
+    <span class="dim">|</span>
+    <label title="Colormap gain. Boost to see low-amplitude features like Rossby waves.">
+      gain
+      <input type="range" id="gain-slider" min="1" max="40" step="1" value="5" style="width:110px">
+      <span class="val" id="gain-val">5</span>
+    </label>
+  </div>
+
+  <!-- Row 4: forcing / dissipation -->
+  <div class="controls-row">
+    <label title="Hyperdiffusion coefficient ν₄. Selectively damps small-scale noise (∇⁴, k⁴ spectrum) without affecting the large scales that carry the physics.">
+      ν₄ <span class="hint">(hyperdiff)</span>
+      <input type="range" id="nu4-slider" min="0" max="0.10" step="0.005" value="0.01" style="width:90px">
+      <span class="val" id="nu4-val">0.010</span>
+    </label>
+    <span class="dim">|</span>
+    <label title="Thermal forcing amplitude. Drives h toward h_eq(y) = −A·cos(2π·j/ny): warm equator (j=ny/2), cold poles (j=0, ny).">
+      A<sub>eq</sub> <span class="hint">(thermal)</span>
+      <input type="range" id="Aeq-slider" min="0" max="1.0" step="0.05" value="0.30" style="width:90px">
+      <span class="val" id="Aeq-val">0.30</span>
+    </label>
+    <span class="dim">|</span>
+    <label title="Newtonian relaxation timescale τ (time units). Small τ = strong forcing toward h_eq.">
+      τ <span class="hint">(relax)</span>
+      <input type="range" id="tau-slider" min="20" max="2000" step="20" value="300" style="width:90px">
+      <span class="val" id="tau-val">300</span>
+    </label>
+    <span class="dim">|</span>
+    <label title="Beta-plane parameter β. f_eff(y) = f₀ + β·(j − ny/2). Breaks north–south symmetry and supports Rossby waves.">
+      β <span class="hint">(beta)</span>
+      <input type="range" id="beta-slider" min="0" max="0.05" step="0.002" value="0" style="width:90px">
+      <span class="val" id="beta-val">0.000</span>
+    </label>
+  </div>
+
   <script type="module" src="/src/main.js"></script>
 </body>
 </html>
