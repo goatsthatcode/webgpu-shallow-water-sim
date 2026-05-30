@@ -32,7 +32,7 @@
     select { background: #111; border: 1px solid #444; color: #aaa; font-family: monospace; font-size: 13px; padding: 3px 6px; border-radius: 3px; cursor: pointer; }
     select:hover { border-color: #3af; }
   </style>
-  <script type="module" crossorigin src="/webgpu-shallow-water-sim/assets/index-DquzGkMf.js"></script>
+  <script type="module" crossorigin src="/webgpu-shallow-water-sim/assets/index-Dzwr0qD6.js"></script>
 </head>
 <body>
   <canvas id="canvas" width="700" height="700"></canvas>
@@ -67,11 +67,17 @@
       <span class="val" id="sigma-val">0.10</span>
     </label>
     <span class="dim">|</span>
-    <label title="Mean fluid depth. Controls gravity wave speed c=√(g·H).">
-      H <span class="hint">(depth)</span>
+    <label title="Mean depth of upper layer. Barotropic wave speed c=√(g·(H₁+H₂)).">
+      H₁ <span class="hint">(upper depth)</span>
       <input type="range" id="H-slider" min="0.02" max="1.0" step="0.02" value="0.25" style="width:110px">
       <span class="val" id="H-val">0.25</span>
-      <span class="dim">c=<span id="c-val">0.50</span></span>
+    </label>
+    <span class="dim">|</span>
+    <label title="Mean depth of lower layer.">
+      H₂ <span class="hint">(lower depth)</span>
+      <input type="range" id="H2-slider" min="0.02" max="1.0" step="0.02" value="0.25" style="width:110px">
+      <span class="val" id="H2-val">0.25</span>
+      <span class="dim">c<sub>bt</sub>=<span id="cbt-val">0.71</span></span>
     </label>
     <span class="dim">|</span>
     <label title="Coriolis parameter f. L_R = c/f is the Rossby deformation radius.">
@@ -87,9 +93,12 @@
     <label>
       display
       <select id="display-select">
-        <option value="0">h anomaly (h − h_eq)</option>
-        <option value="1">vorticity (∂v/∂x − ∂u/∂y)</option>
-        <option value="2">raw h</option>
+        <option value="0">h₁ anomaly (h₁ − h_eq)</option>
+        <option value="1">vorticity layer 1</option>
+        <option value="2">raw h₁</option>
+        <option value="3">h₂ interface</option>
+        <option value="4">barotropic vorticity</option>
+        <option value="5">baroclinic vorticity (ζ₁−ζ₂)</option>
       </select>
     </label>
     <span class="dim">|</span>
@@ -124,6 +133,13 @@
       β <span class="hint">(beta)</span>
       <input type="range" id="beta-slider" min="0" max="0.05" step="0.002" value="0" style="width:90px">
       <span class="val" id="beta-val">0.000</span>
+    </label>
+    <span class="dim">|</span>
+    <label title="Reduced gravity g' = g·(ρ₂−ρ₁)/ρ₂. Sets internal wave speed c₂ = √(g'·H₁H₂/(H₁+H₂)).">
+      g′ <span class="hint">(reduced g)</span>
+      <input type="range" id="gp-slider" min="0" max="0.5" step="0.01" value="0.02" style="width:90px">
+      <span class="val" id="gp-val">0.02</span>
+      <span class="dim">c₂=<span id="c2-val">0.07</span></span>
     </label>
   </div>
 
