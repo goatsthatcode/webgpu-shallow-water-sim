@@ -10,7 +10,12 @@ const sigmaSlider = document.getElementById('sigma-slider');
 const sigmaVal    = document.getElementById('sigma-val');
 const HSlider     = document.getElementById('H-slider');
 const HVal        = document.getElementById('H-val');
-const cVal        = document.getElementById('c-val');
+const H2Slider    = document.getElementById('H2-slider');
+const H2Val       = document.getElementById('H2-val');
+const cbtVal      = document.getElementById('cbt-val');
+const gpSlider    = document.getElementById('gp-slider');
+const gpVal       = document.getElementById('gp-val');
+const c2Val       = document.getElementById('c2-val');
 const fSlider     = document.getElementById('f-slider');
 const fVal        = document.getElementById('f-val');
 const lrVal       = document.getElementById('lr-val');
@@ -29,13 +34,20 @@ const gainVal       = document.getElementById('gain-val');
 let paused   = false;
 let substeps = parseInt(speedSlider.value);
 
-function updateHDisplay(H) {
-  HVal.textContent = H.toFixed(2);
-  cVal.textContent = Math.sqrt(H).toFixed(2);
+function updateHDisplay(H, H2) {
+  HVal.textContent  = H.toFixed(2);
+  H2Val.textContent = H2.toFixed(2);
+  cbtVal.textContent = Math.sqrt(H + H2).toFixed(2);
 }
 
-function updateFDisplay(f, H) {
-  const c = Math.sqrt(H);
+function updateGPDisplay(gp, H, H2) {
+  gpVal.textContent = gp.toFixed(2);
+  const c2 = H > 0 && H2 > 0 ? Math.sqrt(gp * H * H2 / (H + H2)) : 0;
+  c2Val.textContent = c2.toFixed(2);
+}
+
+function updateFDisplay(f, H, H2) {
+  const c = Math.sqrt(H + H2);
   fVal.textContent = f.toFixed(3);
   lrVal.textContent = f > 0 ? (c / f).toFixed(1) : '∞';
 }
@@ -63,8 +75,11 @@ async function main() {
   sigmaVal.textContent = sim.sigma.toFixed(2);
   sigmaSlider.value    = sim.sigma;
   HSlider.value        = sim.H;
-  updateHDisplay(sim.H);
-  updateFDisplay(sim.f, sim.H);
+  H2Slider.value       = sim.H2;
+  gpSlider.value       = sim.g_prime;
+  updateHDisplay(sim.H, sim.H2);
+  updateGPDisplay(sim.g_prime, sim.H, sim.H2);
+  updateFDisplay(sim.f, sim.H, sim.H2);
   nu4Slider.value      = sim.nu4;
   nu4Val.textContent   = sim.nu4.toFixed(3);
   AeqSlider.value      = sim.A_eq;
@@ -97,15 +112,32 @@ async function main() {
 
   HSlider.addEventListener('input', () => {
     const H = parseFloat(HSlider.value);
+    const H2 = parseFloat(H2Slider.value);
     sim.setH(H);
-    updateHDisplay(H);
-    updateFDisplay(parseFloat(fSlider.value), H);
+    updateHDisplay(H, H2);
+    updateFDisplay(parseFloat(fSlider.value), H, H2);
+    updateGPDisplay(parseFloat(gpSlider.value), H, H2);
+  });
+
+  H2Slider.addEventListener('input', () => {
+    const H2 = parseFloat(H2Slider.value);
+    const H  = parseFloat(HSlider.value);
+    sim.setH2(H2);
+    updateHDisplay(H, H2);
+    updateFDisplay(parseFloat(fSlider.value), H, H2);
+    updateGPDisplay(parseFloat(gpSlider.value), H, H2);
+  });
+
+  gpSlider.addEventListener('input', () => {
+    const gp = parseFloat(gpSlider.value);
+    sim.setGPrime(gp);
+    updateGPDisplay(gp, parseFloat(HSlider.value), parseFloat(H2Slider.value));
   });
 
   fSlider.addEventListener('input', () => {
     const f = parseFloat(fSlider.value);
     sim.setF(f);
-    updateFDisplay(f, parseFloat(HSlider.value));
+    updateFDisplay(f, parseFloat(HSlider.value), parseFloat(H2Slider.value));
   });
 
   nu4Slider.addEventListener('input', () => {

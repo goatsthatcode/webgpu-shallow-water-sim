@@ -8,10 +8,10 @@ const WG_SIZE = 8;
 const DT      = 0.4;
 
 // Params buffer layout (shared by all scheme shaders — must stay in sync):
-//   [0]  width u32   [1]  height u32  [2]  dx f32   [3]  dt f32
-//   [4]  step u32    [5]  f f32       [6]  H f32     [7]  nu4 f32
-//   [8]  A_eq f32    [9]  tau f32     [10] beta f32  [11] gain f32
-//   [12] mode u32    [13-15] pad
+//   [0]  width u32   [1]  height u32  [2]  dx f32    [3]  dt f32
+//   [4]  step u32    [5]  f f32       [6]  H f32(H1)  [7]  nu4 f32
+//   [8]  A_eq f32    [9]  tau f32     [10] beta f32   [11] gain f32
+//   [12] mode u32    [13] H2 f32      [14] g_prime f32 [15] pad
 const PARAMS_BYTES = 64;
 
 const SCHEMES = {
@@ -23,7 +23,7 @@ export function createSimulation(device, canvasFormat, initialScheme = 'lax-frie
   // ── Shared state buffers ─────────────────────────────────────────────────
   // Both scheme types use the same two ping-pong state buffers.
   const cellCount  = GRID_NX * GRID_NY;
-  const fieldBytes = cellCount * 3 * 4; // [h | u | v]
+  const fieldBytes = cellCount * 6 * 4; // [h1 | u1 | v1 | h2 | u2 | v2]
 
   const bufs = [0, 1].map(i => device.createBuffer({
     label: `state-${i}`, size: fieldBytes,
@@ -52,16 +52,18 @@ export function createSimulation(device, canvasFormat, initialScheme = 'lax-frie
   }));
 
   // ── Mutable physics state ────────────────────────────────────────────────
-  let step  = 0;
-  let f     = 0.0;
-  let H     = 0.25;
-  let sigma = 0.10;
-  let nu4   = 0.01;
-  let A_eq  = 0.3;
-  let tau   = 300.0;
-  let beta  = 0.0;
-  let gain  = 5.0;
-  let mode  = 0;
+  let step    = 0;
+  let f       = 0.0;
+  let H       = 0.25;
+  let H2      = 0.25;
+  let g_prime = 0.02;
+  let sigma   = 0.10;
+  let nu4     = 0.01;
+  let A_eq    = 0.3;
+  let tau     = 300.0;
+  let beta    = 0.0;
+  let gain    = 5.0;
+  let mode    = 0;
 
   const paramsScratch = new ArrayBuffer(PARAMS_BYTES);
   const paramsU32     = new Uint32Array(paramsScratch);
@@ -73,7 +75,7 @@ export function createSimulation(device, canvasFormat, initialScheme = 'lax-frie
 
   function uploadIC() {
     device.queue.writeBuffer(bufs[0], 0, makeIC(GRID_NX, GRID_NY, sigma));
-    device.queue.writeBuffer(bufs[1], 0, new Float32Array(cellCount * 3));
+    device.queue.writeBuffer(bufs[1], 0, new Float32Array(cellCount * 6));
   }
   uploadIC();
 
@@ -82,15 +84,17 @@ export function createSimulation(device, canvasFormat, initialScheme = 'lax-frie
 
   // ── Tick / render ─────────────────────────────────────────────────────────
   function tick(encoder, substeps = 1) {
-    paramsU32[4] = step;
-    paramsF32[5] = f;
-    paramsF32[6] = H;
+    paramsU32[4]  = step;
+    paramsF32[5]  = f;
+    paramsF32[6]  = H;
     paramsF32[7]  = nu4;
     paramsF32[8]  = A_eq;
     paramsF32[9]  = tau;
     paramsF32[10] = beta;
     paramsF32[11] = gain;
     paramsU32[12] = mode;
+    paramsF32[13] = H2;
+    paramsF32[14] = g_prime;
     device.queue.writeBuffer(paramsBuf, 0, paramsScratch);
     scheme.tick(encoder, substeps);
     step += substeps;
@@ -125,19 +129,23 @@ export function createSimulation(device, canvasFormat, initialScheme = 'lax-frie
 
   return {
     tick, render, reset, setScheme,
-    setF(v)     { f = v; },
-    setH(v)     { H = v; },
-    setSigma(v) { sigma = v; },
-    setNu4(v)   { nu4 = v; },
-    setAEq(v)   { A_eq = v; },
-    setTau(v)   { tau = v; },
-    setBeta(v)  { beta = v; },
-    setGain(v)  { gain = v; },
-    setMode(v)  { mode = v; },
+    setF(v)       { f = v; },
+    setH(v)       { H = v; },
+    setH2(v)      { H2 = v; },
+    setGPrime(v)  { g_prime = v; },
+    setSigma(v)   { sigma = v; },
+    setNu4(v)     { nu4 = v; },
+    setAEq(v)     { A_eq = v; },
+    setTau(v)     { tau = v; },
+    setBeta(v)    { beta = v; },
+    setGain(v)    { gain = v; },
+    setMode(v)    { mode = v; },
     get step()    { return step; },
     get simTime() { return step * DT; },
     get f()       { return f; },
     get H()       { return H; },
+    get H2()      { return H2; },
+    get g_prime() { return g_prime; },
     get sigma()   { return sigma; },
     get nu4()     { return nu4; },
     get A_eq()    { return A_eq; },
@@ -149,13 +157,14 @@ export function createSimulation(device, canvasFormat, initialScheme = 'lax-frie
 }
 
 function makeIC(nx, ny, sigma) {
-  const data = new Float32Array(nx * ny * 3);
+  const data = new Float32Array(nx * ny * 6);
   const cx = nx / 2, cy = ny / 2;
   const sx = sigma * nx, sy = sigma * ny;
   for (let j = 0; j < ny; j++) {
     for (let i = 0; i < nx; i++) {
       const dx = (i - cx) / sx;
       const dy = (j - cy) / sy;
+      // Gaussian perturbation in upper layer h1 only; h2, u1, v1, u2, v2 = 0
       data[j * nx + i] = Math.exp(-(dx * dx + dy * dy));
     }
   }

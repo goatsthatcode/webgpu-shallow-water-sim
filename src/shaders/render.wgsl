@@ -1,26 +1,32 @@
-// Fullscreen quad renderer. Supports three display modes:
-//   mode 0 — h anomaly: h − h_eq(j)   (removes the thermal background, shows waves)
-//   mode 1 — relative vorticity: ζ = ∂v/∂x − ∂u/∂y  (clearest for Rossby waves)
-//   mode 2 — raw h                     (unmodified height field)
+// Fullscreen quad renderer. Six display modes:
+//   0 — h1 anomaly:            (h1 − h_eq)·gain
+//   1 — vorticity layer 1:     ζ1 = (∂v1/∂x − ∂u1/∂y)·gain
+//   2 — raw h1:                h1·gain
+//   3 — h2 interface:          h2·gain
+//   4 — barotropic vorticity:  (H·ζ1 + H2·ζ2)/(H+H2)·gain
+//   5 — baroclinic vorticity:  (ζ1 − ζ2)·gain
 
 struct Params {
-  width:  u32,  // [0]
-  height: u32,  // [1]
-  dx:     f32,  // [2]
-  dt:     f32,  // [3]
-  step:   u32,  // [4]
-  f:      f32,  // [5]
-  H:      f32,  // [6]
-  nu4:    f32,  // [7]
-  A_eq:   f32,  // [8]
-  tau:    f32,  // [9]
-  beta:   f32,  // [10]
-  gain:   f32,  // [11]  colormap amplification
-  mode:   u32,  // [12]  0=h_anom, 1=vorticity
+  width:   u32,  // [0]
+  height:  u32,  // [1]
+  dx:      f32,  // [2]
+  dt:      f32,  // [3]
+  step:    u32,  // [4]
+  f:       f32,  // [5]
+  H:       f32,  // [6]  upper layer mean depth H1
+  nu4:     f32,  // [7]
+  A_eq:    f32,  // [8]
+  tau:     f32,  // [9]
+  beta:    f32,  // [10]
+  gain:    f32,  // [11]
+  mode:    u32,  // [12]
+  H2:      f32,  // [13] lower layer mean depth
+  g_prime: f32,  // [14]
+  _pad:    u32,  // [15]
 }
 
-@group(0) @binding(0) var<uniform>             params: Params;
-@group(0) @binding(1) var<storage, read>       field:  array<f32>;
+@group(0) @binding(0) var<uniform>        params: Params;
+@group(0) @binding(1) var<storage, read>  field:  array<f32>;
 
 const PI: f32 = 3.14159265358979;
 
@@ -42,11 +48,10 @@ fn vs(@builtin(vertex_index) vi: u32) -> VertOut {
   return out;
 }
 
-// Diverging aqua-planet colormap, input in [-1, 1].
 fn colormap(t: f32) -> vec3f {
-  let trough = vec3f(0.08, 0.02, 0.35); // deep indigo
-  let base   = vec3f(0.03, 0.18, 0.42); // ocean blue
-  let crest  = vec3f(0.72, 0.96, 0.98); // bright seafoam
+  let trough = vec3f(0.08, 0.02, 0.35);
+  let base   = vec3f(0.03, 0.18, 0.42);
+  let crest  = vec3f(0.72, 0.96, 0.98);
   if (t < 0.0) { return mix(base, trough, clamp(-t, 0.0, 1.0)); }
   return mix(base, crest, clamp(t, 0.0, 1.0));
 }
@@ -58,24 +63,48 @@ fn fs(in: VertOut) -> @location(0) vec4f {
   let i  = u32(clamp(in.uv.x, 0.0, 0.9999) * f32(nx));
   let j  = u32(clamp(in.uv.y, 0.0, 0.9999) * f32(ny));
 
-  let il = (i + nx - 1u) % nx;
-  let ir = (i + 1u)      % nx;
-  let jd = (j + ny - 1u) % ny;
-  let ju = (j + 1u)      % ny;
+  let il = (i + nx - 1u) % nx;  let ir = (i + 1u)      % nx;
+  let jd = (j + ny - 1u) % ny;  let ju = (j + 1u)      % ny;
+
+  let h1o = 0u;
+  let u1o = nx * ny;
+  let v1o = 2u * nx * ny;
+  let h2o = 3u * nx * ny;
+  let u2o = 4u * nx * ny;
+  let v2o = 5u * nx * ny;
 
   var val: f32;
+
   if params.mode == 1u {
-    // Relative vorticity ζ = (∂v/∂x − ∂u/∂y) · gain
-    let uo   = nx * ny;
-    let vo   = 2u * nx * ny;
-    let dv_dx = field[vo + j  * nx + ir] - field[vo + j  * nx + il];
-    let du_dy = field[uo + ju * nx + i ] - field[uo + jd * nx + i ];
+    // Layer 1 vorticity
+    let dv_dx = field[v1o + j*nx + ir] - field[v1o + j*nx + il];
+    let du_dy = field[u1o + ju*nx + i] - field[u1o + jd*nx + i];
     val = (dv_dx - du_dy) * 0.5 * params.gain;
   } else if params.mode == 2u {
-    val = field[j * nx + i] * params.gain;
+    val = field[h1o + j*nx + i] * params.gain;
+  } else if params.mode == 3u {
+    val = field[h2o + j*nx + i] * params.gain;
+  } else if params.mode == 4u {
+    // Barotropic vorticity: depth-weighted mean of ζ1 and ζ2
+    let z1_dv = field[v1o + j*nx + ir] - field[v1o + j*nx + il];
+    let z1_du = field[u1o + ju*nx + i] - field[u1o + jd*nx + i];
+    let z1    = (z1_dv - z1_du) * 0.5;
+    let z2_dv = field[v2o + j*nx + ir] - field[v2o + j*nx + il];
+    let z2_du = field[u2o + ju*nx + i] - field[u2o + jd*nx + i];
+    let z2    = (z2_dv - z2_du) * 0.5;
+    val = (params.H * z1 + params.H2 * z2) / (params.H + params.H2) * params.gain;
+  } else if params.mode == 5u {
+    // Baroclinic vorticity: ζ1 − ζ2
+    let z1_dv = field[v1o + j*nx + ir] - field[v1o + j*nx + il];
+    let z1_du = field[u1o + ju*nx + i] - field[u1o + jd*nx + i];
+    let z1    = (z1_dv - z1_du) * 0.5;
+    let z2_dv = field[v2o + j*nx + ir] - field[v2o + j*nx + il];
+    let z2_du = field[u2o + ju*nx + i] - field[u2o + jd*nx + i];
+    let z2    = (z2_dv - z2_du) * 0.5;
+    val = (z1 - z2) * params.gain;
   } else {
-    // h anomaly relative to thermal equilibrium
-    let h    = field[j * nx + i];
+    // Mode 0: h1 anomaly relative to thermal equilibrium
+    let h    = field[h1o + j*nx + i];
     let h_eq = -params.A_eq * cos(2.0 * PI * f32(j) / f32(ny));
     val = (h - h_eq) * params.gain;
   }

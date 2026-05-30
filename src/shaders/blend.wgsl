@@ -14,8 +14,8 @@
 //   cs_stage3:  buf_out = uⁿ + dt·k      buf_acc += 2·k
 //   cs_finalize: buf_out = uⁿ + dt/6·(buf_acc + k)
 //
-// Operates element-wise over the flat [h | u | v] array — no field-layout
-// knowledge needed. Dispatched 1D over all 3·NX·NY elements.
+// Operates element-wise over the flat [h1|u1|v1|h2|u2|v2] array — no
+// field-layout knowledge needed. Dispatched 1D over all 6·NX·NY elements.
 
 struct Params {
   width:  u32,
@@ -36,7 +36,7 @@ struct Params {
 @compute @workgroup_size(256)
 fn cs_stage1(@builtin(global_invocation_id) gid: vec3u) {
   let idx = gid.x;
-  if (idx >= params.width * params.height * 3u) { return; }
+  if (idx >= params.width * params.height * 6u) { return; }
   buf_out[idx] = buf_n[idx] + (params.dt * 0.5) * buf_k[idx];
   buf_acc[idx] = buf_k[idx];
 }
@@ -44,7 +44,7 @@ fn cs_stage1(@builtin(global_invocation_id) gid: vec3u) {
 @compute @workgroup_size(256)
 fn cs_stage2(@builtin(global_invocation_id) gid: vec3u) {
   let idx = gid.x;
-  if (idx >= params.width * params.height * 3u) { return; }
+  if (idx >= params.width * params.height * 6u) { return; }
   buf_out[idx] = buf_n[idx] + (params.dt * 0.5) * buf_k[idx];
   buf_acc[idx] += 2.0 * buf_k[idx];
 }
@@ -52,7 +52,7 @@ fn cs_stage2(@builtin(global_invocation_id) gid: vec3u) {
 @compute @workgroup_size(256)
 fn cs_stage3(@builtin(global_invocation_id) gid: vec3u) {
   let idx = gid.x;
-  if (idx >= params.width * params.height * 3u) { return; }
+  if (idx >= params.width * params.height * 6u) { return; }
   buf_out[idx] = buf_n[idx] + params.dt * buf_k[idx];
   buf_acc[idx] += 2.0 * buf_k[idx];
 }
@@ -60,6 +60,6 @@ fn cs_stage3(@builtin(global_invocation_id) gid: vec3u) {
 @compute @workgroup_size(256)
 fn cs_finalize(@builtin(global_invocation_id) gid: vec3u) {
   let idx = gid.x;
-  if (idx >= params.width * params.height * 3u) { return; }
+  if (idx >= params.width * params.height * 6u) { return; }
   buf_out[idx] = buf_n[idx] + (params.dt / 6.0) * (buf_acc[idx] + buf_k[idx]);
 }

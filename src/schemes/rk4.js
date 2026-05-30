@@ -5,8 +5,8 @@ const WG_RHS   = 8;
 const WG_BLEND = 256;
 
 export function createRK4(device, bufs, paramsBuf, nx, ny) {
-  const fieldBytes  = nx * ny * 3 * 4;
-  const totalCells  = nx * ny * 3;
+  const fieldBytes  = nx * ny * 6 * 4;
+  const totalCells  = nx * ny * 6;
   const blendGroups = Math.ceil(totalCells / WG_BLEND);
 
   // Temp buffers — only live while RK4 is the active scheme.
