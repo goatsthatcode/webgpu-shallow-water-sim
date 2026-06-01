@@ -83,8 +83,12 @@ fn cs_main(@builtin(global_invocation_id) gid: vec3u) {
   let dqx = select(q_c - q_l, q_r - q_c, u_s < 0.0);
   let dqy = select(q_c - q_d, q_u - q_c, v_s < 0.0);
 
-  // Evaporation: max at equator (j=ny/2), zero at poles
-  let evap = tparams.e_evap * (1.0 - cos(2.0 * PI * f32(j) / f32(ny))) * 0.5;
+  // Evaporation: confined to the tropical belt (j near ny/2).
+  // max(0, -cos(2πj/ny)) is positive only in the inner half of the domain,
+  // zero at j=0, ny/4, 3ny/4, ny (poles and mid-latitudes).
+  // The extratropics are a dry sink — moisture only arrives there via jet advection,
+  // which is what creates filaments and storm-track signatures.
+  let evap = tparams.e_evap * max(0.0, -cos(2.0 * PI * f32(j) / f32(ny)));
 
   // Precipitation: Newtonian relaxation toward q_sat from above
   let prec = tparams.k_prec * max(0.0, q_c - tparams.q_sat);

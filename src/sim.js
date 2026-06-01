@@ -66,8 +66,8 @@ export function createSimulation(device, canvasFormat, initialScheme = 'lax-frie
   let mode      = 0;
   let layerMode = 1; // 1 = two-layer (default), 0 = single-layer
 
-  let e_evap = 0.002;
-  let k_prec = 1.0;
+  let e_evap = 0.005;
+  let k_prec = 2.0;
   let q_sat  = 1.0;
 
   const paramsScratch = new ArrayBuffer(PARAMS_BYTES);
