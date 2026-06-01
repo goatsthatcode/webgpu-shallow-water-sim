@@ -29,10 +29,11 @@
       padding: 3px 10px; cursor: pointer; border-radius: 3px;
     }
     button:hover { border-color: #3af; color: #3af; }
+    button.layer-active { border-color: #3af; color: #3af; }
     select { background: #111; border: 1px solid #444; color: #aaa; font-family: monospace; font-size: 13px; padding: 3px 6px; border-radius: 3px; cursor: pointer; }
     select:hover { border-color: #3af; }
   </style>
-  <script type="module" crossorigin src="/webgpu-shallow-water-sim/assets/index-Dzwr0qD6.js"></script>
+  <script type="module" crossorigin src="/webgpu-shallow-water-sim/assets/index-CBFLzw-S.js"></script>
 </head>
 <body>
   <canvas id="canvas" width="700" height="700"></canvas>
@@ -57,6 +58,10 @@
         <option value="rk4">RK4 (4th order)</option>
       </select>
     </label>
+    <span class="dim">|</span>
+    layers
+    <button id="layer1-btn">1-slab</button>
+    <button id="layer2-btn" class="layer-active">2-slab</button>
   </div>
 
   <!-- Row 2: physics -->
@@ -67,13 +72,14 @@
       <span class="val" id="sigma-val">0.10</span>
     </label>
     <span class="dim">|</span>
-    <label title="Mean depth of upper layer. Barotropic wave speed c=√(g·(H₁+H₂)).">
-      H₁ <span class="hint">(upper depth)</span>
+    <label id="h1-label-el" title="Mean depth of upper layer. Barotropic wave speed c=√(g·(H₁+H₂)).">
+      <span id="h1-name">H₁</span> <span class="hint" id="h1-hint">(upper depth)</span>
       <input type="range" id="H-slider" min="0.02" max="1.0" step="0.02" value="0.25" style="width:110px">
       <span class="val" id="H-val">0.25</span>
+      <span class="dim" id="c1-display" style="display:none">c=<span id="c1-val">0.50</span></span>
     </label>
-    <span class="dim">|</span>
-    <label title="Mean depth of lower layer.">
+    <span class="dim" id="h2-sep">|</span>
+    <label id="h2-label" title="Mean depth of lower layer.">
       H₂ <span class="hint">(lower depth)</span>
       <input type="range" id="H2-slider" min="0.02" max="1.0" step="0.02" value="0.25" style="width:110px">
       <span class="val" id="H2-val">0.25</span>
@@ -99,6 +105,7 @@
         <option value="3">h₂ interface</option>
         <option value="4">barotropic vorticity</option>
         <option value="5">baroclinic vorticity (ζ₁−ζ₂)</option>
+        <option value="6">tracer q (moisture)</option>
       </select>
     </label>
     <span class="dim">|</span>
@@ -134,12 +141,35 @@
       <input type="range" id="beta-slider" min="0" max="0.05" step="0.002" value="0" style="width:90px">
       <span class="val" id="beta-val">0.000</span>
     </label>
-    <span class="dim">|</span>
-    <label title="Reduced gravity g' = g·(ρ₂−ρ₁)/ρ₂. Sets internal wave speed c₂ = √(g'·H₁H₂/(H₁+H₂)).">
+    <span class="dim" id="gp-sep">|</span>
+    <label id="gp-label" title="Reduced gravity g' = g·(ρ₂−ρ₁)/ρ₂. Sets internal wave speed c₂ = √(g'·H₁H₂/(H₁+H₂)).">
       g′ <span class="hint">(reduced g)</span>
       <input type="range" id="gp-slider" min="0" max="0.5" step="0.01" value="0.02" style="width:90px">
       <span class="val" id="gp-val">0.02</span>
       <span class="dim">c₂=<span id="c2-val">0.07</span></span>
+    </label>
+  </div>
+
+  <!-- Row 5: tracer / moisture -->
+  <div class="controls-row">
+    moisture
+    <span class="dim">|</span>
+    <label title="Evaporation rate. Sets the moisture source at the equator — larger E means faster build-up.">
+      E <span class="hint">(evap)</span>
+      <input type="range" id="evap-slider" min="0" max="0.01" step="0.001" value="0.002" style="width:90px">
+      <span class="val" id="evap-val">0.002</span>
+    </label>
+    <span class="dim">|</span>
+    <label title="Saturation humidity. Moisture above q_sat precipitates at rate k.">
+      q<sub>sat</sub>
+      <input type="range" id="qsat-slider" min="0.1" max="2.0" step="0.1" value="1.0" style="width:90px">
+      <span class="val" id="qsat-val">1.0</span>
+    </label>
+    <span class="dim">|</span>
+    <label title="Precipitation rate coefficient k. Higher = faster rain-out above q_sat.">
+      k <span class="hint">(prec rate)</span>
+      <input type="range" id="prec-slider" min="0" max="5" step="0.1" value="1.0" style="width:90px">
+      <span class="val" id="prec-val">1.0</span>
     </label>
   </div>
 
