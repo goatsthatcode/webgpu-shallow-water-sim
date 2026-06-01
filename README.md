@@ -256,7 +256,7 @@ Schemes are modular: `createLaxFriedrichs` and `createRK4` each return `{ tick, 
 - [x] Stage 3 — Linearized SWE, gravity waves, Lax-Friedrichs
 - [x] Stage 4 — Coriolis, geostrophic adjustment, Rossby radius display
 - [x] Stage 5 — RK4, thermal forcing, beta-plane, hyperdiffusion, vorticity display
-- [ ] Stage 6 — Two-layer SWE (baroclinic instability, storm tracks)
-- [ ] Stage 7 — Tracer advection + precipitation
+- [x] Stage 6 — Two-layer SWE (baroclinic instability, storm tracks)
+- [x] Stage 7 — Tracer advection + precipitation
 - [ ] Stage 8 — Sphere projection (globe visualization)
 - [ ] Stage 9+ — Interactive forcing, topography, primitive equations

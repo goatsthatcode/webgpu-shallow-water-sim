@@ -33,7 +33,7 @@ struct Params {
   _pad1:   u32,  // [12] (mode in render shader)
   H2:      f32,  // [13] lower layer mean depth
   g_prime: f32,  // [14] reduced gravity
-  _pad2:   u32,  // [15]
+  layerMode: u32,  // [15] 0=single-layer, 1=two-layer
 }
 
 @group(0) @binding(0) var<uniform>             params: Params;
@@ -126,10 +126,16 @@ fn cs_main(@builtin(global_invocation_id) gid: vec3u) {
                         - params.nu4 * biharm(v1o, i, j, nx, ny);
 
   // ── Layer 2 ────────────────────────────────────────────────────────────
-  dst[h2o + j*nx + i] = -params.H2 * ((u2_r - u2_l) + (v2_u - v2_d)) * inv2dx
-                        - params.nu4 * biharm(h2o, i, j, nx, ny);
-  dst[u2o + j*nx + i] = -g * dsurf_dx - params.g_prime * dh2_dx + f_eff * v2_c
-                        - params.nu4 * biharm(u2o, i, j, nx, ny);
-  dst[v2o + j*nx + i] = -g * dsurf_dy - params.g_prime * dh2_dy - f_eff * u2_c
-                        - params.nu4 * biharm(v2o, i, j, nx, ny);
+  if params.layerMode == 0u {
+    dst[h2o + j*nx + i] = 0.0;
+    dst[u2o + j*nx + i] = 0.0;
+    dst[v2o + j*nx + i] = 0.0;
+  } else {
+    dst[h2o + j*nx + i] = -params.H2 * ((u2_r - u2_l) + (v2_u - v2_d)) * inv2dx
+                          - params.nu4 * biharm(h2o, i, j, nx, ny);
+    dst[u2o + j*nx + i] = -g * dsurf_dx - params.g_prime * dh2_dx + f_eff * v2_c
+                          - params.nu4 * biharm(u2o, i, j, nx, ny);
+    dst[v2o + j*nx + i] = -g * dsurf_dy - params.g_prime * dh2_dy - f_eff * u2_c
+                          - params.nu4 * biharm(v2o, i, j, nx, ny);
+  }
 }

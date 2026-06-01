@@ -24,7 +24,7 @@ struct Params {
   _pad1:   u32,  // [12] (mode in render shader)
   H2:      f32,  // [13] lower layer mean depth
   g_prime: f32,  // [14] reduced gravity
-  _pad2:   u32,  // [15]
+  layerMode: u32,  // [15] 0=single-layer, 1=two-layer
 }
 
 @group(0) @binding(0) var<uniform>             params: Params;
@@ -104,14 +104,20 @@ fn cs_main(@builtin(global_invocation_id) gid: vec3u) {
                        - params.dt * f_eff * u1_c;
 
   // ── Layer 2 ────────────────────────────────────────────────────────────
-  dst[h2o + j*nx + i] = h2_avg
-                       - params.H2 * c * ((u2_r - u2_l) + (v2_u - v2_d));
-  dst[u2o + j*nx + i] = u2_avg
-                       - g * c * ((h1_r + h2_r) - (h1_l + h2_l))
-                       - params.g_prime * c * (h2_r - h2_l)
-                       + params.dt * f_eff * v2_c;
-  dst[v2o + j*nx + i] = v2_avg
-                       - g * c * ((h1_u + h2_u) - (h1_d + h2_d))
-                       - params.g_prime * c * (h2_u - h2_d)
-                       - params.dt * f_eff * u2_c;
+  if params.layerMode == 0u {
+    dst[h2o + j*nx + i] = 0.0;
+    dst[u2o + j*nx + i] = 0.0;
+    dst[v2o + j*nx + i] = 0.0;
+  } else {
+    dst[h2o + j*nx + i] = h2_avg
+                         - params.H2 * c * ((u2_r - u2_l) + (v2_u - v2_d));
+    dst[u2o + j*nx + i] = u2_avg
+                         - g * c * ((h1_r + h2_r) - (h1_l + h2_l))
+                         - params.g_prime * c * (h2_r - h2_l)
+                         + params.dt * f_eff * v2_c;
+    dst[v2o + j*nx + i] = v2_avg
+                         - g * c * ((h1_u + h2_u) - (h1_d + h2_d))
+                         - params.g_prime * c * (h2_u - h2_d)
+                         - params.dt * f_eff * u2_c;
+  }
 }

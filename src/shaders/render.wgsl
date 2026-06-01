@@ -1,10 +1,11 @@
-// Fullscreen quad renderer. Six display modes:
+// Fullscreen quad renderer. Seven display modes:
 //   0 — h1 anomaly:            (h1 − h_eq)·gain
 //   1 — vorticity layer 1:     ζ1 = (∂v1/∂x − ∂u1/∂y)·gain
 //   2 — raw h1:                h1·gain
 //   3 — h2 interface:          h2·gain
 //   4 — barotropic vorticity:  (H·ζ1 + H2·ζ2)/(H+H2)·gain
 //   5 — baroclinic vorticity:  (ζ1 − ζ2)·gain
+//   6 — tracer q:              q·gain  (moisture)
 
 struct Params {
   width:   u32,  // [0]
@@ -22,11 +23,13 @@ struct Params {
   mode:    u32,  // [12]
   H2:      f32,  // [13] lower layer mean depth
   g_prime: f32,  // [14]
-  _pad:    u32,  // [15]
+  layerMode: u32,  // [15]
+  q_sat:     f32,  // [16] saturation threshold — used to normalize tracer display
 }
 
 @group(0) @binding(0) var<uniform>        params: Params;
 @group(0) @binding(1) var<storage, read>  field:  array<f32>;
+@group(0) @binding(2) var<storage, read>  tracer: array<f32>;
 
 const PI: f32 = 3.14159265358979;
 
@@ -102,6 +105,13 @@ fn fs(in: VertOut) -> @location(0) vec4f {
     let z2_du = field[u2o + ju*nx + i] - field[u2o + jd*nx + i];
     let z2    = (z2_dv - z2_du) * 0.5;
     val = (z1 - z2) * params.gain;
+  } else if params.mode == 6u {
+    // Tracer / moisture: normalize by q_sat so the full colormap is used.
+    // q=0 (dry) → −1 → deep indigo
+    // q=q_sat/2 → 0 → ocean blue
+    // q=q_sat (saturated) → +1 → seafoam
+    let q_norm = tracer[j*nx + i] / max(params.q_sat, 0.001);
+    val = (q_norm - 0.5) * 2.0 * params.gain;
   } else {
     // Mode 0: h1 anomaly relative to thermal equilibrium
     let h    = field[h1o + j*nx + i];
